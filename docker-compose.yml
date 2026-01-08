@@ -24,6 +24,7 @@ services:
       - "1"
       - --gpu-memory-utilization
       - "0.9"
+      - --disable-frontend-multiprocessing
     deploy:
       resources:
         reservations:
