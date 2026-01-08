@@ -737,12 +737,166 @@ kubectl delete pvc vllm-model-cache -n vllm
 
 ---
 
+## Performance Benchmarking
+
+### Running Concurrent Session Benchmarks
+
+After deploying vLLM on Kubernetes, you can run comprehensive performance benchmarks to evaluate throughput, latency, and scalability.
+
+#### Prerequisites
+
+```bash
+# Ensure vLLM is deployed and running
+kubectl get pods -n vllm
+
+# Set up port forwarding
+kubectl port-forward service/vllm-service 8000:8000 -n vllm
+```
+
+#### Run the Benchmark
+
+```bash
+# Install required Python packages (if not already installed)
+pip install aiohttp matplotlib numpy
+
+# Run the benchmark script
+python3 kubernetes_vllm_concurrent_benchmark.py
+```
+
+#### What the Benchmark Tests
+
+The benchmark script tests vLLM performance with:
+- **Multiple concurrency levels**: 1, 2, 4, 8, 16 concurrent sessions
+- **5 requests per session**: Total of 5 to 80 requests per test
+- **Various metrics**: Latency (avg, median, P95, P99), throughput, success rate
+
+#### Benchmark Outputs
+
+The script generates three outputs:
+
+1. **Console Output**: Real-time results for each concurrency level
+2. **Visualization**: `kubernetes_vllm_concurrent_benchmark.png` with 6 graphs:
+   - Average Latency vs Concurrency
+   - Latency Percentiles (P50, P95, P99)
+   - Overall Throughput
+   - Requests Processed
+   - Total Execution Time
+   - Average Tokens Per Second
+
+3. **JSON Results**: `kubernetes_vllm_benchmark_results.json` with detailed metrics
+
+#### Sample Output
+
+```bash
+============================================================
+vLLM on Kubernetes Concurrent Benchmark
+============================================================
+Target: http://localhost:8000/v1
+Model: TinyLlama/TinyLlama-1.1B-Chat-v1.0
+✅ vLLM server is reachable
+
+============================================================
+RESULTS: 16 Concurrent Sessions
+============================================================
+Total Requests:       80
+Successful:           80 ✓
+Failed:               0
+Total Time:           0.64s
+
+Latency Statistics:
+  Average:            0.265s
+  Median:             0.206s
+  P95:                0.640s
+  P99:                0.640s
+
+Throughput:
+  Avg tokens/sec:     32.78
+  Overall throughput: 1889.47 tokens/sec
+  Total tokens:       1212
+============================================================
+```
+
+#### Customizing the Benchmark
+
+Edit `kubernetes_vllm_concurrent_benchmark.py` to customize:
+
+```python
+# Change concurrency levels
+concurrency_levels = [1, 5, 10, 20, 50]
+
+# Change requests per session
+requests_per_session = 10
+
+# Change vLLM endpoint (for LoadBalancer/Ingress)
+VLLM_BASE_URL = "http://your-loadbalancer-ip:8000/v1"
+
+# Change model
+MODEL_NAME = "meta-llama/Llama-2-7b-chat-hf"
+```
+
+#### Comparing Deployment Methods
+
+Run benchmarks for different deployment configurations:
+
+```bash
+# 1. Single pod deployment
+kubectl scale deployment vllm-deployment --replicas=1 -n vllm
+python3 kubernetes_vllm_concurrent_benchmark.py
+
+# 2. Multiple replicas with load balancing
+kubectl scale deployment vllm-deployment --replicas=3 -n vllm
+python3 kubernetes_vllm_concurrent_benchmark.py
+
+# 3. Multi-GPU deployment (edit deployment.yaml first)
+# Change --tensor-parallel-size to 2
+kubectl apply -f kubernetes/vllm-deployment.yaml
+python3 kubernetes_vllm_concurrent_benchmark.py
+```
+
+#### Performance Optimization Tips
+
+Based on benchmark results:
+
+1. **High Latency**:
+   - Increase pod resources
+   - Use faster GPU nodes
+   - Reduce `--max-model-len`
+   - Increase `--gpu-memory-utilization`
+
+2. **Low Throughput**:
+   - Scale to multiple replicas
+   - Enable HorizontalPodAutoscaler
+   - Use larger batch sizes
+   - Consider multi-GPU deployment
+
+3. **Failed Requests**:
+   - Check pod logs: `kubectl logs -f <pod-name> -n vllm`
+   - Increase pod memory limits
+   - Check network connectivity
+   - Verify GPU availability
+
+#### Kubernetes vs Docker Performance
+
+Compare results with Docker deployment:
+- Docker results: `docker_vllm_benchmark_results.json`
+- Kubernetes results: `kubernetes_vllm_benchmark_results.json`
+- Docker graph: `docker_vllm_concurrent_benchmark.png`
+- Kubernetes graph: `kubernetes_vllm_concurrent_benchmark.png`
+
+Expected differences:
+- Kubernetes may have slightly higher latency due to service routing
+- Kubernetes offers better scalability with multiple replicas
+- Docker may have lower overhead for single-instance deployments
+
+---
+
 ## Resources
 
 - [vLLM Documentation](https://docs.vllm.ai/)
 - [Kubernetes GPU Documentation](https://kubernetes.io/docs/tasks/manage-gpus/scheduling-gpus/)
 - [NVIDIA GPU Operator](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/overview.html)
 - [vLLM GitHub](https://github.com/vllm-project/vllm)
+- [Docker Benchmark Results](Docker_Benchmark_Summary.md)
 
 ---
 
